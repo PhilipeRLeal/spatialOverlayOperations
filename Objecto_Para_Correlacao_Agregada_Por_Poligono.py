@@ -74,9 +74,17 @@ class Correlacionador_e_Plotador_por_Poligono(object):
         self.Corr.loc[self.Corr.P_value >self.Alpha, 'R2_masked' ] = np.nan
 
         try:
-            self.Corr = gpd.GeoDataFrame(self.GDF.loc[:, [str(Groupby_parameter_name), 'geometry_G']].merge(self.Corr, left_on=[str(Groupby_parameter_name)], 
-					right_on=[str(Groupby_parameter_name)],
-					how='inner'), geometry='geometry_G')
+            
+            if self.GDF.crs == None:
+                print("Faltou a inserção de um CRS. Tentaremos inserir pelo padrão do geopandas.GeoDataFrame")
+                self.Corr = gpd.GeoDataFrame(self.GDF.loc[:, [str(Groupby_parameter_name), 'geometry_G']].merge(self.Corr, left_on=[str(Groupby_parameter_name)], 
+    					right_on=[str(Groupby_parameter_name)],
+    					how='inner'), geometry='geometry_G')
+            else:
+                self.Corr = gpd.GeoDataFrame(self.GDF.loc[:, [str(Groupby_parameter_name), 'geometry_G']].merge(self.Corr, left_on=[str(Groupby_parameter_name)], 
+    					right_on=[str(Groupby_parameter_name)],
+    					how='inner'), geometry='geometry_G', crs=self.GDF.crs)
+                
             print("\n\n" , "GeoDataFrame criado com sucesso\n\n")
         except:
             print("\n\n" , "Problemas na criação do GeoDataframe")
@@ -138,17 +146,22 @@ class Correlacionador_e_Plotador_por_Poligono(object):
 						edgecolor='k', 
 						alpha=0.6, 
 						linewidth=Linewidth,
-						transform=self.ax.transData,
+						transform=self.Transform,
 						legend_kwds=Legend_KWDS)
 
 
         xy =(0.15, 0.02)
 
-        Nan_patch = mpatches.Patch(color='grey', label='P-valor > $alfa$')
+        Nan_patch = mpatches.Patch(color='grey', label='P-valor > $alfa$: {0}'.format(self.Alpha))
 
         self.fig.legend(handles=[Nan_patch], loc=(xy[0], xy[1]), fontsize=7.5)
 
-        self.Corr.loc[self.Corr['P_value']>self.Alpha].plot(ax=self.ax, legend=False, facecolor='grey', edgecolor='k', linewidth=Linewidth)
+        self.Corr.loc[self.Corr['P_value']>self.Alpha].plot(ax=self.ax, 
+                                                             legend=False, 
+                                                             facecolor='grey', 
+                                                             edgecolor='k', 
+                                                             linewidth=Linewidth,
+                                                             transform=self.Transform)
 
         self.Gridliner = self.ax.gridlines(crs=self.projection , draw_labels=True, linewidth=0.5, alpha=0.4, color='k', linestyle='--')
         
