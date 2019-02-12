@@ -15,18 +15,59 @@ import cartopy.crs as ccrs
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 import matplotlib.ticker as mticker
 
+
+
+
 class Correlacionador_e_Plotador_por_Poligono(object):
-    def __init__(self, GDF):
+    def __init__(self, GDF, Figure_Path_saver=None, Figura_em_Ingles='N'):
+        """
+        Esta classe de objeto realiza a análise de correlação município específica com base na série histórica dos dados fornecidos.
+        Esta classe também plota esta análise de correlação.
+        
+        Parâmetros de entrada:
+            - GDF: geodataframe contendo os dados a serem correlacionados
+            
+            - Figure_Path_saver (por padrão==None): caminho a ser utilizado para save da figura gerada
+                Se a classe for instanciada com Figure_Path_saver definido como uma string, ele se utilizará desta String para salvar a figura automaticamente
+            
+            - Figura_em_Ingles (por padrão =='N'): se deixado como padrão, a figura terá formato brasileiro (decimal == ',') e algumas legendas ('p-valor', 'alfa') em português
+        
+        """
+        
+        
         self.GDF = GDF
         self.__Corr_Pronto = None
         self.Alpha = 0.05
+        self.Figura_em_Ingles = Figura_em_Ingles
+        
+        self.Definindo_locale_Matplotlib(self.Figura_em_Ingles)
+        
+        self.Figure_Path_saver = Figure_Path_saver
+        
+    def Definindo_locale_Matplotlib(self, Internacional='N'):
+        if Internacional=='N':
+            import locale
+            locale.setlocale(locale.LC_ALL, "Portuguese_Brazil.1252")
+            import matplotlib as mpl
+            mpl.rcParams['axes.formatter.use_locale'] = True
+        
+        else:
+            None
+    
+    
+    def Correlacionador(self, DF, Nome_Param_1='EVI_250m_mean', Nome_Param_2='HAV', Decisao=2):
 
-    def Correlacionador(self, DF, Nome_Param_1='EVI_250m_mean', Nome_Param_2='HAV'):
-
-		
-		
-        return [np.round(self.Tipo_de_Correlacao(DF.loc[:,Nome_Param_1].values, DF.loc[:,Nome_Param_2].apply(lambda x: np.log(x+0.00001)).values), 10)]
-
+        
+        
+        if Decisao == 0:
+            return [np.round(self.Tipo_de_Correlacao(DF.loc[:,Nome_Param_1].values, DF.loc[:,Nome_Param_2].values), 10)]  
+        elif Decisao == 1:
+            return [np.round(self.Tipo_de_Correlacao(DF.loc[:,Nome_Param_1].apply(lambda x: np.log(x+self.Semi_log_Adder)).values, DF.loc[:,Nome_Param_2].values), 10)]
+        elif Decisao == 2:
+            return [np.round(self.Tipo_de_Correlacao(DF.loc[:,Nome_Param_1].values, DF.loc[:,Nome_Param_2].apply(lambda x: np.log(x+self.Semi_log_Adder)).values), 10)]
+        else:
+            return [np.round(self.Tipo_de_Correlacao(DF.loc[:,Nome_Param_1].apply(lambda x: np.log(x+self.Semi_log_Adder)).values, DF.loc[:,Nome_Param_2].apply(lambda x: np.log(x+self.Semi_log_Adder)).values), 10)]
+        
     def Replacer(self, instance):
         instance['R2'] = instance['Pearson_R2'][0][0]
         instance['P_value'] = instance['Pearson_R2'][0][1]
@@ -58,9 +99,29 @@ class Correlacionador_e_Plotador_por_Poligono(object):
             self.Tipo_de_Correlacao=spearmanr
 
         print("Eis as colunas para correlação: ", self.GDF.columns)
+        
+        
+        
+        self.__Nome_Param_1=input('Insira o nome do Parametro 1 para correlacao: ')
+        self.__Nome_Param_2=input('Insira o nome do Parametro 2 para correlacao: ')
+        
+        self.__Decisao = int(input("Quais variáveis devem ter seus dados transformados pelo semi-log? \n [1] para: {0} ;\n [2] para: {1} ;\n [3] para Ambas: ({0}, {1}) ;\n [0] para Nenhuma: \n".format(self.__Nome_Param_1 , self.__Nome_Param_2)))
+        
+        if self.__Decisao != 0:
+            print("Valor padrão do Semi-log: {0}".format(0.00001))
+            if input("Usar o valor padrão para a transformação de semi-log (S/N)? ").lower() == 's':
+                self.Semi_log_Adder = 0.00001
+                
+            
+            else:
+                self.Semi_log_Adder = float(input('Defina o valor a ser adicionado na funcao semi-log: '))
+        
+        
         Corr = self.GDF.groupby([str(Groupby_parameter_name)]).apply(func=self.Correlacionador, 
-																	 Nome_Param_1=input('Insira o nome do Parametro 1 para correlacao: '),
-																	 Nome_Param_2=input('Insira o nome do Parametro 2 para correlacao: '))
+																	 Nome_Param_1 = self.__Nome_Param_1,
+																	 Nome_Param_2 = self.__Nome_Param_2,
+                                                                     Decisao = self.__Decisao)
+        
 
         Corr.name = 'Pearson_R2'
         self.Corr = pd.DataFrame(Corr)
@@ -98,7 +159,10 @@ class Correlacionador_e_Plotador_por_Poligono(object):
     def Print_Correlated_GDF(self, Transform=None, Projection=None,
 							Suptitle='Correlação do EVI com o semi-log da incidência do HAV',
 							Linewidth= 0.3,
-							N_Ticks=5):
+							N_Ticks=5,
+                            groupby_parameter_name='GEOCODE_7', 
+							tipo_de_correlacao='Pearson', 
+							alpha=0.05):
         """
 		Parametros:
 			GDF: geodataframe (geopandas)
@@ -114,7 +178,9 @@ class Correlacionador_e_Plotador_por_Poligono(object):
         """
         
         if self.__Corr_Pronto is None:
-            self.Get_Correlation_from_Municipalities()
+            self.Get_Correlation_from_Municipalities(Groupby_parameter_name=groupby_parameter_name, 
+                        							 Tipo_de_Correlacao=tipo_de_correlacao, 
+                        							 Alpha=alpha)
         else:
             print("Continuando")
             None
@@ -133,29 +199,36 @@ class Correlacionador_e_Plotador_por_Poligono(object):
         self.fig.suptitle(Suptitle)
 
 
-        Legend_KWDS ={'loc':(1.25, 0.18),'fontsize':8,
-                  'bbox_transform':self.ax.transAxes,
-                  'markerscale':0.75, # The relative size of legend markers compared with the originally drawn ones
-                  'columnspacing':0.5, # The spacing between columns
-                  'labelspacing':0.8, # The vertical space between the legend entries
-                  'handletextpad':0.001} # float or None: The vertical space between the legend entries.
+        Legend_KWDS ={
+                      'loc':(1.25, 0.18),'fontsize':8,
+                      'bbox_transform':self.ax.transAxes,
+                      'markerscale':0.75, # The relative size of legend markers compared with the originally drawn ones
+                      'columnspacing':0.5, # The spacing between columns
+                      'labelspacing':0.8, # The vertical space between the legend entries
+                      'handletextpad':0.001} # float or None: The vertical space between the legend entries.
 
         self.Corr.plot(ax= self.ax, 
-					   column='R2', legend=True, 
+					    column='R2', legend=True, 
 						facecolor='white', 
 						edgecolor='k', 
 						alpha=0.6, 
 						linewidth=Linewidth,
 						transform=self.Transform,
-						legend_kwds=Legend_KWDS)
+						legend_kwds=Legend_KWDS,
+                        label= '$R^2$')
 
-
+        self.Colorbar = self.fig.axes[-1]
+        
+        try:
+            self.Colorbar.axes.set_ylabel('$R^2$\n(Pearson)')
+        except:
+            print("Nao foi possivel adicionar um label ao colorbar")
+        #self.Colorbar.ax.tick_params(labelsize=10) --- to set the size of the tickparameters of the Colorbar
+        
+        
         xy =(0.15, 0.02)
 
-        Nan_patch = mpatches.Patch(color='grey', label='P-valor > $alfa$: {0}'.format(self.Alpha))
-
-        self.fig.legend(handles=[Nan_patch], loc=(xy[0], xy[1]), fontsize=7.5)
-
+        
         self.Corr.loc[self.Corr['P_value']>self.Alpha].plot(ax=self.ax, 
                                                              legend=False, 
                                                              facecolor='grey', 
@@ -170,14 +243,8 @@ class Correlacionador_e_Plotador_por_Poligono(object):
         self.Gridliner.right_labels = False
         self.Gridliner.xlabels_top = False
         self.Gridliner.ylabels_right = False
-        if input("Quer converter os decimais '.' em ',': (S/N) ").lower() == 's':
-			
-
-            for i in range(len(self.fig.axes)):
-                self.__Correcao_de_Ticks_para_Figuras_Brasileiras(axes_number=i)
-        else:
-            None
-
+        
+        
 
 		### Adding North Arrow:
         self.Add_North_Arrow()
@@ -202,64 +269,72 @@ class Correlacionador_e_Plotador_por_Poligono(object):
         self.ax.xlabel_style = {'size': 15, 'color': 'gray'}
         self.ax.xlabel_style = {'size': 15, 'color': 'gray'}
 
-#        
-#        BB = self.ax.get_position()
-#        
-#        Axes = self.fig.get_axes()
-#
-#        Colorbar = Axes[-1]
-#        
-#        xoc, xf = Colorbar.get_position().intervalx
-#
-#        Axes = self.fig.get_axes()
-#        Colorbar = Axes[-1]
-#        Bbox = Colorbar.get_position()
-#        
-#        xoc, xfc = Bbox.intervalx
-#        ###########
-#        
-#        
-#        
-#        x0, xf = BB.intervalx
-#        y0, yf = BB.intervaly
-#        x_tail = xf
-#        y_tail = y0
-#        dx = xf - xoc
-#        dy = yf - y0
-#
-#        Retangle = mpatches.Rectangle( (x_tail, y_tail), dx*2, dy,  fill=True, transform=self.fig.transFigure, facecolor='Blue', figure=self.fig)
-#
-#        self.fig.patches.extend([Retangle])
-		
-        if input("Quer salvar a figura?: (S/N)").lower() == 's':
-            Path_fig_save = input("Insira o caminho do diretorio para salvar a figura: ")
+        if self.Figura_em_Ingles.upper() == 'N':
 
-            if os.path.exists(Path_fig_save) == False:
-                os.mkdir(Path_fig_save)
+            
+            Nan_patch = mpatches.Patch(color='grey', label='P-valor > $alfa$: {0}'.format(str(self.Alpha).replace('.',',')))
 
-            Nome_fig = input("Insira o nome da Figura para ser salva (ex: figura.png): ")
+            self.fig.legend(handles=[Nan_patch], loc=(xy[0], xy[1]), fontsize=7.5)
 
-            self.fig.savefig(os.path.join(Path_fig_save, Nome_fig), dpi=900)
-            print("\n\n", "Figura {0} salva ".format(Nome_fig), "\n\n")
+            
         else:
-            None
+            Nan_patch = mpatches.Patch(color='grey', label='P-value > $alpha$: {0}'.format(self.Alpha))
 
-
+            self.fig.legend(handles=[Nan_patch], loc=(xy[0], xy[1]), fontsize=7.5)
+        
+        if self.Figure_Path_saver is None:
+            if input("Quer salvar a figura?: (S/N) \n   ").lower() == 's':
+                Path_fig_save = input("Insira o caminho do diretorio para salvar a figura: ")
+    
+                if os.path.exists(Path_fig_save) == False:
+                    os.mkdir(Path_fig_save)
+    
+                Nome_fig = input("Insira o nome da Figura para ser salva (ex: figura.png): ")
+    
+                self.fig.savefig(os.path.join(Path_fig_save, Nome_fig), dpi=900)
+                print("\n\n", "Figura {0} salva ".format(Nome_fig), "\n\n")
+            else:
+                None
+                
+        else:
+            
+    
+            if os.path.exists(os.path.dirname(self.Figure_Path_saver)) == False:
+                os.mkdir(os.path.dirname(Path_fig_save))
+            
+            else:
+                None
+                
+            if self.Figure_Path_saver.endswith('.png')==True:
+                
+                self.fig.savefig(self.Figure_Path_saver, dpi=900)
+                print("\n\n", "Figura {0} salva ".format(os.path.basename(self.Figure_Path_saver), "\n\n"))
+            
+            else:
+                try:
+                    self.fig.savefig(self.Figure_Path_saver, dpi=900)
+                    print("\n\n", "Figura {0} salva ".format(os.path.basename(self.Figure_Path_saver)), "\n\n")   
+                
+                except:
+                    print("Problemas no save da figura. Use um nome da figura terminando com .png para garantir o save do Matplotlib")
+                    Saver = input("Insira um novo nome para a figura (dica: termine com .png): ")
+                    self.fig.savefig(Saver, dpi=900)
+                
         return [self.fig, self.ax]
 
-    def __Correcao_de_Ticks_para_Figuras_Brasileiras(self, axes_number=-1):
+    def Correcao_de_Ticks_para_Figuras_Brasileiras(self):
         """
 		Parameter:
 			axes_number: o número do axes da figura que será corrigida. 
 				Por padrão é o fig.axes[-1] == (axes do colorbar).
 
         """
-        self.Ticksbar = self.fig.axes[-1]
+        
 
 
-        self.Ticksbar_Y_legend = self.Ticksbar.get_yticklabels()
+        self.Colorbar_Y_legend = self.Colorbar.get_yticklabels()
 
-        for yi in self.Ticksbar_Y_legend:
+        for yi in self.Colorbar_Y_legend:
             T = yi.get_text()
             T = T.replace('.',',')
             yi = yi.set_text(T)
@@ -267,13 +342,13 @@ class Correlacionador_e_Plotador_por_Poligono(object):
             print(T)
 
 
-        self.Ticksbar.set_yticklabels(self.Ticksbar_Y_legend)
+        self.Colorbar.set_yticklabels(self.Colorbar_Y_legend)
 
 
 
-        self.Ticksbar_X_legend = self.Ticksbar.get_xticklabels()
+        self.Colorbar_X_legend = self.Colorbar.get_xticklabels()
 
-        for xi in self.Ticksbar_X_legend:
+        for xi in self.Colorbar_X_legend:
             T = xi.get_text()
             T = T.replace('.',',')
             xi = xi.set_text(T)
@@ -281,34 +356,66 @@ class Correlacionador_e_Plotador_por_Poligono(object):
             print(T)
 
 
-        self.Ticksbar.set_xticklabels(self.Ticksbar_X_legend)
+        self.Colorbar.set_xticklabels(self.Colorbar_X_legend)
+
 
 		## Setting ticks from the Axis X and Y of the main Axes
         Xticks = self.ax.get_xticklabels()
-
+        X_tick_corrected_list= []
         for i in Xticks:
             T = i.get_text()
-            T = T.replace('.',',')
-            i = i.set_text(T)
-					
+            T.replace('.',',')
+            i.set_text(T)
+            
             print(T)
-		    
-        self.ax.set_xticklabels(Xticks)
-
+            X_tick_corrected_list.append(T)
+            
+        self.ax.set_xticklabels(X_tick_corrected_list)
+        
+        
+        print("Tentando alterar os ticks do Axes")
 
         Yticks = self.ax.get_yticklabels()
-
-        for i in Xticks:
+        Y_tick_corrected_list= []
+        for i in Yticks:
             T = i.get_text()
-            T = T.replace('.',',')
-            i = i.set_text(T)
+            T.replace('.',',')
+            i.set_text(T)
 					
             print(T)
-		    
-        self.ax.set_yticklabels(Yticks)
+            Y_tick_corrected_list.append(T)
+            
+        self.ax.set_yticklabels(Y_tick_corrected_list)
 
-
-
+        ### Tentativa final:
+        try:
+            print("Penúltima Tentativa de Setar os ticks dos axis x e y")
+            print("\n\n")
+            
+            print("Ticks do Eixo x já corrigidas", pd.Series(self.ax.get_xticks()).apply(lambda x: str(x).replace('.', ',')).values)
+            self.ax.set_xticklabels(pd.Series(self.ax.get_xticks()).apply(lambda x: str(x).replace('.', ',')).values)
+            
+            print("Ticks do Eixo y já corrigidas", pd.Series(self.ax.get_yticks()).apply(lambda x: str(x).replace('.', ',')).values)
+            
+            self.ax.set_yticklabels(pd.Series(self.ax.get_yticks()).apply(lambda x: str(x).replace('.', ',')).values)
+        except:
+            None
+            
+        print("Última Tentativa de Setar os ticks dos axis x e y")
+        print("\n\n")
+            
+        import matplotlib.ticker as tkr
+        
+        def func(x, pos):  # formatter function takes tick label and tick position
+            s = str(x)
+            ind = s.index('.')
+            return s[:ind] + ',' + s[ind+1:]   # change dot to comma
+        
+        y_format = tkr.FuncFormatter(func)
+        self.ax.yaxis.set_major_formatter(y_format)  # set formatter to needed axis
+        self.ax.xaxis.set_major_formatter(y_format)
+                    
+                    
     def Add_scale_bar(self, ax, length=None, location=(0.5, 0.01), linewidth=2.5):
         """
 		ax is the axes to draw the scalebar on.
