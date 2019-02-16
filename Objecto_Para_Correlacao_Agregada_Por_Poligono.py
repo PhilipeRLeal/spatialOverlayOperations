@@ -42,7 +42,7 @@ class Correlacionador_e_Plotador_por_Poligono(object):
         
         self.Definindo_locale_Matplotlib(self.Figura_em_Ingles)
         
-        self.Figure_Path_saver = Figure_Path_saver
+        self.__Figure_Path_saver = Figure_Path_saver
     
     
     @property
