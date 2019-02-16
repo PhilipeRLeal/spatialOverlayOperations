@@ -322,7 +322,7 @@ class Correlacionador_e_Plotador_por_Poligono(object):
 
 
         self.ax.xlabel_style = {'size': 15, 'color': 'gray'}
-        self.ax.xlabel_style = {'size': 15, 'color': 'gray'}
+        self.ax.ylabel_style = {'size': 15, 'color': 'gray'}
 
         if self.Figura_em_Ingles.upper() == 'N':
 
