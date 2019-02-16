@@ -43,6 +43,15 @@ class Correlacionador_e_Plotador_por_Poligono(object):
         self.Definindo_locale_Matplotlib(self.Figura_em_Ingles)
         
         self.Figure_Path_saver = Figure_Path_saver
+    
+    
+    @property
+    def Figure_Path_saver(self):
+        return self.__Figure_Path_saver
+        
+    @Figure_Path_saver.setter
+    def Figure_Path_saver(self, Path):
+        self.__Figure_Path_saver = Path        
         
     def Definindo_locale_Matplotlib(self, Internacional='N'):
         if Internacional=='N':
@@ -57,7 +66,6 @@ class Correlacionador_e_Plotador_por_Poligono(object):
     
     def Correlacionador(self, DF, Nome_Param_1='EVI_250m_mean', Nome_Param_2='HAV', Decisao=2):
 
-        
         
         if Decisao == 0:
             return [np.round(self.Tipo_de_Correlacao(DF.loc[:,Nome_Param_1].values, DF.loc[:,Nome_Param_2].values), 10)]  
@@ -85,13 +93,29 @@ class Correlacionador_e_Plotador_por_Poligono(object):
     def Get_Correlation_from_Municipalities(self, 
 											Groupby_parameter_name='GEOCODE_7', 
 											Tipo_de_Correlacao='Pearson', 
-											Alpha=0.05):
+											Alpha=0.05,
+                                            Geometry_column=None):
         """ 
 		DF: Geodataframe contendo todos os dados já tabelados para correlação
 		Groupby_parameter_name: nome do atributo para ser agrupado. Por padrão: 'GEOCODE_7'
 		Tipo_de_Correlacao: Pearson ou Spearman. Por padrão, usar Pearson
 
         """
+        
+        
+        
+        if hasattr(self, 'Geometry_column') == False and Geometry_column == None:
+            print("\n\n","Eis as colunas do GDF para seleção do geometry_column:", self.GDF.columns)
+            self.Geometry_column = input("Selecione entre as opções dadas acima, qual deve ser utilizada como geometry para reconstrução do GeodataFrame: " )
+        else:
+            if hasattr(self, 'Geometry_column') == False:
+                self.Geometry_column = Geometry_column
+            else:
+                Geometry_column = self.Geometry_column
+        
+        
+        # Definindo o tipo de correlação que será utilizada:
+        
         
         if Tipo_de_Correlacao.lower().startswith('pe'):
             self.Tipo_de_Correlacao= pearsonr
@@ -136,15 +160,15 @@ class Correlacionador_e_Plotador_por_Poligono(object):
 
         try:
             
-            if self.GDF.crs == None:
+            if hasattr(self.GDF, 'crs') == False:
                 print("Faltou a inserção de um CRS. Tentaremos inserir pelo padrão do geopandas.GeoDataFrame")
-                self.Corr = gpd.GeoDataFrame(self.GDF.loc[:, [str(Groupby_parameter_name), 'geometry_G']].merge(self.Corr, left_on=[str(Groupby_parameter_name)], 
+                self.Corr = gpd.GeoDataFrame(self.GDF.loc[:, [str(Groupby_parameter_name), self.Geometry_column]].merge(self.Corr, left_on=[str(Groupby_parameter_name)], 
     					right_on=[str(Groupby_parameter_name)],
-    					how='inner'), geometry='geometry_G')
+    					how='inner'), geometry=self.Geometry_column)
             else:
-                self.Corr = gpd.GeoDataFrame(self.GDF.loc[:, [str(Groupby_parameter_name), 'geometry_G']].merge(self.Corr, left_on=[str(Groupby_parameter_name)], 
+                self.Corr = gpd.GeoDataFrame(self.GDF.loc[:, [str(Groupby_parameter_name), self.Geometry_column]].merge(self.Corr, left_on=[str(Groupby_parameter_name)], 
     					right_on=[str(Groupby_parameter_name)],
-    					how='inner'), geometry='geometry_G', crs=self.GDF.crs)
+    					how='inner'), geometry=self.Geometry_column, crs=self.GDF.crs)
                 
             print("\n\n" , "GeoDataFrame criado com sucesso\n\n")
         except:
@@ -160,7 +184,7 @@ class Correlacionador_e_Plotador_por_Poligono(object):
 							Suptitle='Correlação do EVI com o semi-log da incidência do HAV',
 							Linewidth= 0.3,
 							N_Ticks=5,
-                            groupby_parameter_name='GEOCODE_7', 
+                            groupby_parameter_name=None, 
 							tipo_de_correlacao='Pearson', 
 							alpha=0.05):
         """
@@ -177,13 +201,30 @@ class Correlacionador_e_Plotador_por_Poligono(object):
 
         """
         
+        
+        if groupby_parameter_name == None:
+            print("groupby_parameter_name is None. Selecione entre as opções dadas: \n", self.GDF.columns)
+            
+            groupby_parameter_name = input("Insira o nome do atributo que será utilizado para agrupar os dados: \n")
+        
+        else:
+            None
+            
+        self.groupby_parameter_name = groupby_parameter_name    
+        
+        
+        
         if self.__Corr_Pronto is None:
             self.Get_Correlation_from_Municipalities(Groupby_parameter_name=groupby_parameter_name, 
                         							 Tipo_de_Correlacao=tipo_de_correlacao, 
                         							 Alpha=alpha)
         else:
-            print("Continuando")
-            None
+            if input("Os dados já foram calculados uma vez. Gostaria de calcular novamente (S/N)?").upper() == 'S':
+                self.Get_Correlation_from_Municipalities(Groupby_parameter_name=groupby_parameter_name, 
+                        							 Tipo_de_Correlacao=tipo_de_correlacao, 
+                        							 Alpha=alpha)
+            else:
+                None
 
         if Transform == None:
 
@@ -206,7 +247,18 @@ class Correlacionador_e_Plotador_por_Poligono(object):
                       'columnspacing':0.5, # The spacing between columns
                       'labelspacing':0.8, # The vertical space between the legend entries
                       'handletextpad':0.001} # float or None: The vertical space between the legend entries.
-
+        try:
+            gpd.GeoDataFrame(self.GDF, geometry='geometry_G').plot(ax=self.ax, 
+                       legend=False, 
+                       facecolor='grey', 
+                       edgecolor='k', 
+                       linewidth=Linewidth,
+                       transform=self.Transform)
+        except:
+            None
+        
+        
+        
         self.Corr.plot(ax= self.ax, 
 					    column='R2', legend=True, 
 						facecolor='white', 
@@ -229,12 +281,15 @@ class Correlacionador_e_Plotador_por_Poligono(object):
         xy =(0.15, 0.02)
 
         
+              
+        
         self.Corr.loc[self.Corr['P_value']>self.Alpha].plot(ax=self.ax, 
                                                              legend=False, 
                                                              facecolor='grey', 
                                                              edgecolor='k', 
                                                              linewidth=Linewidth,
                                                              transform=self.Transform)
+        
 
         self.Gridliner = self.ax.gridlines(crs=self.projection , draw_labels=True, linewidth=0.5, alpha=0.4, color='k', linestyle='--')
         
@@ -282,7 +337,7 @@ class Correlacionador_e_Plotador_por_Poligono(object):
 
             self.fig.legend(handles=[Nan_patch], loc=(xy[0], xy[1]), fontsize=7.5)
         
-        if self.Figure_Path_saver is None:
+        if self.__Figure_Path_saver is None:
             if input("Quer salvar a figura?: (S/N) \n   ").lower() == 's':
                 Path_fig_save = input("Insira o caminho do diretorio para salvar a figura: ")
     
@@ -299,21 +354,21 @@ class Correlacionador_e_Plotador_por_Poligono(object):
         else:
             
     
-            if os.path.exists(os.path.dirname(self.Figure_Path_saver)) == False:
+            if os.path.exists(os.path.dirname(self.__Figure_Path_saver)) == False:
                 os.mkdir(os.path.dirname(Path_fig_save))
             
             else:
                 None
                 
-            if self.Figure_Path_saver.endswith('.png')==True:
+            if self.__Figure_Path_saver.endswith('.png')==True:
                 
-                self.fig.savefig(self.Figure_Path_saver, dpi=900)
-                print("\n\n", "Figura {0} salva ".format(os.path.basename(self.Figure_Path_saver), "\n\n"))
+                self.fig.savefig(self.__Figure_Path_saver, dpi=900)
+                print("\n\n", "Figura {0} salva ".format(os.path.basename(self.__Figure_Path_saver), "\n\n"))
             
             else:
                 try:
-                    self.fig.savefig(self.Figure_Path_saver, dpi=900)
-                    print("\n\n", "Figura {0} salva ".format(os.path.basename(self.Figure_Path_saver)), "\n\n")   
+                    self.fig.savefig(self.__Figure_Path_saver, dpi=900)
+                    print("\n\n", "Figura {0} salva ".format(os.path.basename(self.__Figure_Path_saver)), "\n\n")   
                 
                 except:
                     print("Problemas no save da figura. Use um nome da figura terminando com .png para garantir o save do Matplotlib")
