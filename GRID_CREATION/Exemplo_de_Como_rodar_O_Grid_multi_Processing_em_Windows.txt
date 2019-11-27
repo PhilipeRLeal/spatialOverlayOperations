@@ -1,0 +1,6 @@
+# exemplo de como testar o algoritmo do Python no Windows.
+
+
+cd C:\Users\Philipe Leal\Dropbox\Profissao\Python\OSGEO\OGR_Vetor\Geopandas\GRID_CREATION
+
+python PARALLEL_ALGORITHM_FOR_GRID_CREATION_VIA_GEOPANDAS.py 
