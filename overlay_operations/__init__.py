@@ -3,5 +3,5 @@ __version__ = '0.1'
 
 
 
-from .custom_plots.functions import *
+from .overlay_operations import *
 
