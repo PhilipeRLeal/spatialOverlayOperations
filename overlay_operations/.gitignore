@@ -1,0 +1,16 @@
+# Gitignore
+
+
+__pycache__
+
+*.png
+*.jpeg
+*.nc
+*.tif
+*.shp
+*.dbf
+*.prj
+*.qpj
+*.shx
+*.ipynb
+*.ipynb_checkpoints
