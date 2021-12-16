@@ -10,7 +10,7 @@ This Library operates solely with:
 
 	## First package: categorical_overlay_operations
 
-		As its name says, it overlay operations for 		categorical data
+		As its name says, it overlay operations for categorical data
 
 
 	## Second package: numerical_overlay_operations
