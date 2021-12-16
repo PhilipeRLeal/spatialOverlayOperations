@@ -64,8 +64,8 @@ class overlay_spatial_mean_class():
             if (c not in lista ) and ( np.issubdtype(column_type, np.number) )  :
             
                 gdf[str(c) + '_frac'] = gdf.apply(lambda x: (x[c] *x.geometry.area /  
-                                                           x['gdf2_area'] 
-                                                           ), 
+                                                             x['gdf2_area'] 
+                                                            ), 
                                                 axis=1)
          
         
