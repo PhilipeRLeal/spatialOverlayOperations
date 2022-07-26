@@ -1,6 +1,0 @@
-include README.md
-include docs/*.txt
-include gcdistance
-
-
-include tests/Data_example/MUNICIPIOS*
